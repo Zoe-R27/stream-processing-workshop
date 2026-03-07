@@ -64,7 +64,7 @@ public class AddressSortAndStringifyTest {
   }
 
   @Test
-  void wiAddressRekeyAndStringify() {
+  void wiAddressRekeyAndStringify() { // map function
 
     var addressId = "address-123";
     var address = new Address(

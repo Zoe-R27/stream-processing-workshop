@@ -6,7 +6,9 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Named;
 import org.apache.kafka.streams.kstream.Produced;
+import org.msse.demo.mockdata.customer.profile.Customer;
 
+import static org.apache.kafka.streams.kstream.EmitStrategy.log;
 import static org.improving.workshop.Streams.*;
 
 /**
@@ -42,11 +44,21 @@ public class TargetCustomerFilter {
 
         builder
             .stream(TOPIC_DATA_DEMO_CUSTOMERS, Consumed.with(Serdes.String(), SERDE_CUSTOMER_JSON))
+                .merge(builder.stream(LEGACY_INPUT_TOPIC, Consumed.with(Serdes.String(), SERDE_CUSTOMER_JSON)))
 
             // TIP - Incoming birth dt format -> "YYYY-MM-DD"
 
-            .peek((customerId, customer) -> log.info("Target Customer Found, 90s music incoming - {}", customerId))
+                .filter((key, value) -> checkYear(value))
+
+            .peek((customerId, customer) -> log.info("Target Customer Found, 90s music incoming - {}, {}", customerId, customer.birthdt()))
             // NOTE: when using ccloud, the topic must exist or 'auto.create.topics.enable' set to true (dedicated cluster required)
             .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), SERDE_CUSTOMER_JSON));
     }
+
+    private static Boolean checkYear(Customer customer) {
+        int year = Integer.parseInt(customer.birthdt().split("-")[0]);
+        log.info("year: {}", year);
+        return year >= 1990 && year < 2000;
+    }
+
 }
