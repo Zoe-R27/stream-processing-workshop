@@ -40,6 +40,9 @@ public class OutOfStateTicketHolders {
     // https://excalidraw.com/#room=04c461b0eded34d8be3a,-qc3vkyxs7ptYEqDMO6s8w
 
     static void configureTopology(final StreamsBuilder builder) {
+        // There are two address KTables because they are partitioned differently, and theoretically, should be filtered to customers and venue addresses
+        // Question, is it possible for a customer to use a venue for their address and vice versa?
+
         // KTable used for event venue address lookup, gets merged with venue
         KTable<String, Address> addressKTable = builder
                 .stream(TOPIC_DATA_DEMO_ADDRESSES, Consumed.with (Serdes.String(), SERDE_ADDRESS_JSON))
@@ -133,10 +136,6 @@ public class OutOfStateTicketHolders {
                 // potentially want to repartition by customer
                 // .selectKey()
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), CUSTOMER_ADDRESS_TICKET_JSON_SERDE));
-
-
-
-
     }
 
     @Data
