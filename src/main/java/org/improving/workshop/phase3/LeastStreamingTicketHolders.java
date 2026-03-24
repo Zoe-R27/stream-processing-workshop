@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.*;
@@ -15,16 +17,15 @@ import org.springframework.kafka.support.serializer.JsonSerde;
 import java.util.*;
 import static java.util.stream.Collectors.toMap;
 import static org.apache.kafka.streams.state.Stores.persistentKeyValueStore;
+import static org.improving.workshop.Streams.*;
 
 @SuppressWarnings("InfiniteLoopStatement")
+@Slf4j
 public class LeastStreamingTicketHolders {
-    public static final JsonSerde<Event> SERDE_EVENT_JSON = new JsonSerde<>(Event.class);
-    public static final JsonSerde<Ticket> SERDE_TICKET_JSON = new JsonSerde<>(Ticket.class);
-    public static final JsonSerde<EventTicket> SERDE_EVENT_TICKET_JSON = new JsonSerde<>(EventTicket.class);
-    public static final JsonSerde<Stream> SERDE_STREAM_JSON = new JsonSerde<>(Stream.class);
-    public static final int bottomStreamers = 10;
+    public static final int bottomStreamers = 2;
     public static final JsonSerde<SortedCounterMap> COUNTER_MAP_JSON_SERDE = new JsonSerde<>(SortedCounterMap.class);
-    public static final String LOWEST_STREAMED_TICKETED_CUSTOMERS = "lowest-streamed-ticketed-customers-output-topic";
+    private static final JsonSerde<EventTicket> SERDE_EVENT_TICKET_JSON = new JsonSerde<>(EventTicket.class);
+    public static final String LOWEST_STREAMED_TICKETED_CUSTOMERS_TOPIC = "lowest-streamed-ticketed-customers-output-topic";
     // Jackson is converting Value into Integer Not Long due to erasure,
     //public static final JsonSerde<LinkedHashMap<String, Long>> LINKED_HASH_MAP_JSON_SERDE = new JsonSerde<>(LinkedHashMap.class);
     public static final JsonSerde<LinkedHashMap<String, Long>> LINKED_HASH_MAP_JSON_SERDE
@@ -34,10 +35,18 @@ public class LeastStreamingTicketHolders {
             new ObjectMapper()
                     .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
     );
+
     public static void main(String[] args) {
+        final StreamsBuilder builder = new StreamsBuilder();
+
+        // configure the processing topology
+        leastStreamingTicketHoldersTopology(builder, bottomStreamers);
+
+        // fire up the engines
+        startStreams(builder);
     }
 
-    static void leastStreamingTicketHoldersTopology(final StreamsBuilder builder) {
+    static void leastStreamingTicketHoldersTopology(final StreamsBuilder builder, int bottomNumberStreamers) {
         // store events in a table so that the ticket can reference them to find capacity
         KTable<String, Event> eventsTable = builder
                 .table(
@@ -49,7 +58,7 @@ public class LeastStreamingTicketHolders {
                 );
 
         // Get all the tickets for an event and join with the events on the event Id
-        KStream<String, EventTicket> eventTicketByCustomerId = builder
+        KTable<String, EventTicket> eventTicketByCustomerIdTable = builder
                 .stream("data-demo-tickets", Consumed.with(Serdes.String(), SERDE_TICKET_JSON))
                 // rekey by eventid so we can join against the event ktable
                 .selectKey((ticketId, ticketRequest) -> ticketRequest.eventid(), Named.as("rekey-by-eventid"))
@@ -59,28 +68,28 @@ public class LeastStreamingTicketHolders {
                         eventsTable,
                         (eventId, ticket, event) -> new EventTicket(ticket, event)
                 )
-                .selectKey((eventId, event) -> event.ticket.customerid(), Named.as("rekey-by-customerid"));
-
-        // KTable to store the Event Tickets - Key on Customer Id
-        KTable<String, EventTicket> eventTicketByCustomerTable = builder
-                .table(
-                        eventTicketByCustomerId.toString(),
+                .selectKey((eventId, event) -> event.ticket.customerid())
+                .peek((eventTicketId, eventTicket) -> log.info("Event Ticket Received: {} for id: {}", eventTicket, eventTicketId))
+                .toTable(
                         Materialized
-                                .<String, EventTicket>as(persistentKeyValueStore("eventTicket"))
+                                .<String, EventTicket>as(persistentKeyValueStore("eventTickets"))
                                 .withKeySerde(Serdes.String())
                                 .withValueSerde(SERDE_EVENT_TICKET_JSON)
                 );
 
+
         // Join the Event Tickets with the Streams on the customer Id, filter where the stream and the event have the same artist Id
-        //
         builder
                 .stream("data-demo-streams", Consumed.with(Serdes.String(), SERDE_STREAM_JSON))
-                .selectKey((streamId, streamRequest) -> streamRequest.customerid(), Named.as("rekey-stream-by-customerid"))
+                .peek((streamId, stream) -> log.info("Stream Received: {}", stream))
+                .selectKey((streamId, streamRequest) -> streamRequest.customerid())
                 .join(
-                        eventTicketByCustomerTable,
-                        (customerid, stream, eventTicket) -> new CustomerStreamEventTicket(stream, eventTicket)
+                        eventTicketByCustomerIdTable,
+                        (customerId, stream, eventTicket) -> new CustomerStreamEventTicket(stream, eventTicket)
                 )
+                .peek((customerStreamEventTicketId, customerStreamEventTicket) -> log.info("Stream Received and Joined for Event Ticket: {}", customerStreamEventTicket))
                 .filter(((s, customerStreamEventTicket) -> Objects.equals(customerStreamEventTicket.eventTicket.event.artistid(), customerStreamEventTicket.stream.artistid())))
+                .peek((customerStreamEventTicketId, customerStreamEventTicket) -> log.info("Filtered Artist Streamed Ticket Event: {}", customerStreamEventTicketId))
                 .groupByKey()
                 .aggregate(
                         SortedCounterMap::new,
@@ -98,32 +107,25 @@ public class LeastStreamingTicketHolders {
                                 .withValueSerde(COUNTER_MAP_JSON_SERDE)
                 )
                 .toStream()
-                .mapValues(sortedCounterMap -> sortedCounterMap.top(bottomStreamers))
-                .to(LOWEST_STREAMED_TICKETED_CUSTOMERS, Produced.with(Serdes.String(), LINKED_HASH_MAP_JSON_SERDE));
+                .peek((sortedCounterMapId, sortedCounterMap) -> log.info("Sorted Counted Map: {}", sortedCounterMap))
+                .mapValues(sortedCounterMap -> sortedCounterMap.top(bottomNumberStreamers))
+                .to(LOWEST_STREAMED_TICKETED_CUSTOMERS_TOPIC, Produced.with(Serdes.String(), LINKED_HASH_MAP_JSON_SERDE));
     }
 
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     public static class EventTicket {
         private Ticket ticket;
         private Event event;
-
-        public EventTicket(Ticket ticket, Event event) {
-            this.ticket = ticket;
-            this.event = event;
-        }
     }
 
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     public static class CustomerStreamEventTicket {
         private Stream stream;
         private EventTicket eventTicket;
-
-        public CustomerStreamEventTicket(Stream stream, EventTicket eventTicket) {
-            this.stream = stream;
-            this.eventTicket = eventTicket;
-        }
     }
 
     @Data
