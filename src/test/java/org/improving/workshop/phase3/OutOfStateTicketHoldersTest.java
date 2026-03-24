@@ -75,7 +75,7 @@ public class OutOfStateTicketHoldersTest {
         );
 
         outputTopic = driver.createOutputTopic(
-                PurchaseEventTicket.OUTPUT_TOPIC,
+                OutOfStateTicketHolders.OUTPUT_TOPIC,
                 stringDeserializer,
                 OutOfStateTicketHolders.CUSTOMER_ADDRESS_TICKET_JSON_SERDE.deserializer()
         );
@@ -174,6 +174,12 @@ public class OutOfStateTicketHoldersTest {
                 "Hudson", "WI", "45409", "2234", "USA", 0.0, 0.0);
         addressInputTopic.pipeInput(venue2AddressId, venue2Address);
 
+        String venue1Id = "venue-1";
+        venueInputTopic.pipeInput(venue1Id, new Venue(venue1Id, venue1AddressId, "great venue 1", 5));
+
+        String venue2Id = "venue-2";
+        venueInputTopic.pipeInput(venue2Id, new Venue(venue2Id, venue2AddressId, "great venue 2", 5));
+
         String[] eventIds = {
                 "MN-event-1",
                 "MN-event-2",
@@ -183,13 +189,13 @@ public class OutOfStateTicketHoldersTest {
 
         for (String eventId: eventIds) {
             if (eventId.contains("MN")) {
-                eventInputTopic.pipeInput(eventId, new Event(eventId, "artist-1", venue1AddressId, 5, "today"));
+                eventInputTopic.pipeInput(eventId, new Event(eventId, "artist-1", venue1Id, 5, "today"));
             } else if (eventId.contains("WI")) {
-                eventInputTopic.pipeInput(eventId, new Event(eventId, "artist-1", venue2AddressId, 5, "today"));
+                eventInputTopic.pipeInput(eventId, new Event(eventId, "artist-1", venue2Id, 5, "today"));
             }
         }
 
-        ArrayList<MockCustomer> customers = new ArrayList<>(List.of(
+        ArrayList<MockCustomer> customers = new ArrayList<MockCustomer>(List.of(
                 // multiple in state and one out of state
                 new MockCustomer("c1", "MN", new ArrayList<>(List.of("MN-event-1", "MN-event-2", "MN-event-3", "WI-event-1"))),
                 // instate match only
@@ -223,10 +229,11 @@ public class OutOfStateTicketHoldersTest {
 
         assertEquals(expectedEventCount, outputRecords.size());
         for (TestRecord<String, OutOfStateTicketHolders.CustomerAddressTicket> record: outputRecords) {
-            var customer = record.key();
+            var eventId = record.key();
             OutOfStateTicketHolders.CustomerAddressTicket cat = record.value();
+            var customer = cat.getCustomerId();
+            assertEquals(eventId, cat.getTicket().eventid());
             assertEquals(customer, cat.getCustomerId());
-            var eventId = cat.getTicket().eventid();
             // eventid has state code at the beginning of eventid. Assert customer address state is different
             assert(!eventId.contains(cat.getCustomerAddress().state()));
             assert(expectedEvents.getOrDefault(customer,new ArrayList<>()).contains(eventId));
@@ -264,7 +271,7 @@ public class OutOfStateTicketHoldersTest {
             }
             for (Ticket ticket: this.tickets) {
                 var eventId = ticket.eventid();
-                if (eventId.contains(this.address.state())) {
+                if (!eventId.contains(this.address.state())) {
                     expectedEvents.add(eventId);
                 }
             }
