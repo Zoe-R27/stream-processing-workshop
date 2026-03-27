@@ -69,7 +69,8 @@ public class LeastStreamingTicketHolders {
                         eventsTable,
                         (eventId, ticket, event) -> new EventTicket(ticket, event)
                 )
-                .selectKey((eventId, event) -> event.ticket.customerid())
+                // Rekey to have both customerId + artistId to make distinct for each artist the customer streams
+                .selectKey((eventId, event) -> event.ticket.customerid() + "-" + event.event.artistid())
                 .peek((eventTicketId, eventTicket) -> log.info("Event Ticket Received: {} for id: {}", eventTicket, eventTicketId))
                 .toTable(
                         Materialized
@@ -83,10 +84,10 @@ public class LeastStreamingTicketHolders {
         builder
                 .stream("data-demo-streams", Consumed.with(Serdes.String(), SERDE_STREAM_JSON))
                 .peek((streamId, stream) -> log.info("Stream Received: {}", stream))
-                .selectKey((streamId, streamRequest) -> streamRequest.customerid())
+                .selectKey((streamId, streamRequest) -> streamRequest.customerid() + "-" + streamRequest.artistid())
                 .join(
                         eventTicketByCustomerIdTable,
-                        (customerId, stream, eventTicket) -> new CustomerStreamEventTicket(stream, eventTicket)
+                        (customerArtistId, stream, eventTicket) -> new CustomerStreamEventTicket(stream, eventTicket)
                 )
                 .peek((customerStreamEventTicketId, customerStreamEventTicket) -> log.info("Stream Received and Joined for Event Ticket: {}", customerStreamEventTicket))
                 .filter(((s, customerStreamEventTicket) -> Objects.equals(customerStreamEventTicket.eventTicket.event.artistid(), customerStreamEventTicket.stream.artistid())))

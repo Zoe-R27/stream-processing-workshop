@@ -1,5 +1,6 @@
 package org.improving.workshop.phase3;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.Serializer;
@@ -25,6 +26,7 @@ import static org.improving.workshop.phase3.LeastStreamingTicketHolders.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Slf4j
 public class LeastStreamingTicketHoldersTest {
     private final static Serializer<String> stringSerializer = Serdes.String().serializer();
     private final static Deserializer<String> stringDeserializer = Serdes.String().deserializer();
@@ -243,7 +245,7 @@ public class LeastStreamingTicketHoldersTest {
         String artist = "TaylorSwift";
         String artist2 = "LorienTestard";
         eventInputTopic.pipeInput(eventId, new Event(eventId, artist, "venue-123", 5, "tomorrow"));
-        eventInputTopic.pipeInput(eventId, new Event(eventId2, artist2, "venue-123", 5, "tomorrow"));
+        eventInputTopic.pipeInput(eventId2, new Event(eventId2, artist2, "venue-123", 5, "tomorrow"));
 
         // Tickets for an event
         String customerId1 = "customer-1";
@@ -255,16 +257,30 @@ public class LeastStreamingTicketHoldersTest {
         ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId2, eventId));
         ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId3, eventId));
 
-        // tickets for event 2 with different artist
-        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId1, eventId2));
-        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId2, eventId2));
-        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId4, eventId2));
-
         // Streams for the Artist (customer 2 and 3 only have 1 stream)
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist));
+
+        var outputRecords = outputTopic.readRecordsToList();
+
+        assertEquals(4, outputRecords.size());
+        //the last record holds the initial top 3 state
+        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        // assert the artist key
+        assertTrue(lastResult.containsKey(artist));
+
+        // assert customer1 and customer2 are the lowest streamers since they have a ticket
+        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        assertEquals(2, lowestStreamers.size());
+        assertTrue(lowestStreamers.containsKey(customerId2));
+        assertTrue(lowestStreamers.containsKey(customerId3));
+
+        // tickets for event 2 with different artist
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId1, eventId2));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId2, eventId2));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId4, eventId2));
 
         // Streams for Arist 2 (customer 1 and 4 have 1 stream
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist2));
@@ -274,11 +290,32 @@ public class LeastStreamingTicketHoldersTest {
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist2));
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId4, artist2));
 
+        var outputRecords2 = outputTopic.readRecordsToList();
 
+        lastResult = outputRecords2.getLast().getValue();
+        assertTrue(lastResult.containsKey(artist2));
+        lowestStreamers = lastResult.get(artist2);
+        assertEquals(2, lowestStreamers.size());
+        assertTrue(lowestStreamers.containsKey(customerId1));
+        assertTrue(lowestStreamers.containsKey(customerId4));
 
-        var outputRecords = outputTopic.readRecordsToList();
+        // Add another stream for artist1
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId4, eventId));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId4, artist));
 
-        assertEquals(10, outputRecords.size());
+        var outputRecords3 = outputTopic.readRecordsToList();
+
+        log.info(outputRecords3.toString());
+        lastResult = outputRecords3.getLast().getValue();
+        assertTrue(lastResult.containsKey(artist));
+        lowestStreamers = lastResult.get(artist);
+        assertEquals(2, lowestStreamers.size());
+        assertTrue(lowestStreamers.containsKey(customerId3));
+        assertTrue(lowestStreamers.containsKey(customerId4));
+
     }
 
 
