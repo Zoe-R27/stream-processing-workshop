@@ -56,6 +56,7 @@ public class LeastStreamingTicketHolders {
                                 .withKeySerde(Serdes.String())
                                 .withValueSerde(SERDE_EVENT_JSON)
                 );
+        eventsTable.toStream().peek((s, event) -> log.info("Event {}", event));
 
         // Get all the tickets for an event and join with the events on the event Id
         KTable<String, EventTicket> eventTicketByCustomerIdTable = builder

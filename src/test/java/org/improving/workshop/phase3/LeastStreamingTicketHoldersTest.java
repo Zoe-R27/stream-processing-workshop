@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.improving.workshop.phase3.LeastStreamingTicketHolders.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class LeastStreamingTicketHoldersTest {
     private final static Serializer<String> stringSerializer = Serdes.String().serializer();
@@ -111,6 +112,173 @@ public class LeastStreamingTicketHoldersTest {
         var outputRecords = outputTopic.readRecordsToList();
 
         assertEquals(4, outputRecords.size());
+        //the last record holds the initial top 3 state
+        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        // assert the artist key
+        assertTrue(lastResult.containsKey(artist));
+
+        // assert customer1 and customer2 are the lowest streamers
+        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        assertEquals(2, lowestStreamers.size());
+        assertTrue(lowestStreamers.containsKey(customerId2));
+        assertTrue(lowestStreamers.containsKey(customerId3));
+    }
+
+    /**
+     * Scenario: Event has 3 customers, each which have different number of streams for the event's artist.
+     * There are 2 extra customers that don't have tickets but stream the artist
+     * Only the 2, lowest streaming customers should be shown
+     */
+    @Test
+    @DisplayName("lowest streaming customers of an artist for an event they have a ticket for")
+    void lowestStreamingTicketedCustomerWithExtraCustomers() {
+        // Event
+        String eventId = "event-123";
+        String artist = "TaylorSwift";
+        eventInputTopic.pipeInput(eventId, new Event(eventId, artist, "venue-123", 5, "tomorrow"));
+
+        // Tickets for an event
+        String customerId1 = "customer-1";
+        String customerId2 = "customer-2";
+        String customerId3 = "customer-3";
+        String customerId4 = "customer-4";
+        String customerId5 = "customer-5";
+
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId1, eventId));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId2, eventId));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId3, eventId));
+
+        // Streams for the Artist (customer 2 and 3 only have 1 stream)
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId4, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId5, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist));
+
+        var outputRecords = outputTopic.readRecordsToList();
+
+        assertEquals(4, outputRecords.size());
+        //the last record holds the initial top 3 state
+        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        // assert the artist key
+        assertTrue(lastResult.containsKey(artist));
+
+        // assert customer1 and customer2 are the lowest streamers since they have a ticket
+        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        assertEquals(2, lowestStreamers.size());
+        assertTrue(lowestStreamers.containsKey(customerId2));
+        assertTrue(lowestStreamers.containsKey(customerId3));
+    }
+
+    /**
+     * Scenario: Validate as streams come in that the lowest streamed updates
+     * There are 2 extra customers that don't have tickets but stream the artist
+     * Only the 2, lowest streaming customers should be shown
+     */
+    @Test
+    @DisplayName("lowest streaming customers of an artist for an event they have a ticket for")
+    void lowestStreamingTicketedCustomerContinuous() {
+        // Event
+        String eventId = "event-123";
+        String artist = "TaylorSwift";
+        eventInputTopic.pipeInput(eventId, new Event(eventId, artist, "venue-123", 5, "tomorrow"));
+
+        // Tickets for an event
+        String customerId1 = "customer-1";
+        String customerId2 = "customer-2";
+        String customerId3 = "customer-3";
+        String customerId4 = "customer-4";
+        String customerId5 = "customer-5";
+
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId1, eventId));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId2, eventId));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId3, eventId));
+
+        // Streams for the Artist (customer 2 and 3 only have 1 stream)
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId4, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId5, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist));
+
+        var outputRecords = outputTopic.readRecordsToList();
+
+        assertEquals(4, outputRecords.size());
+        //the last record holds the initial top 3 state
+        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        // assert the artist key
+        assertTrue(lastResult.containsKey(artist));
+
+        // assert customer1 and customer2 are the lowest streamers since they have a ticket
+        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        assertEquals(2, lowestStreamers.size());
+        assertTrue(lowestStreamers.containsKey(customerId2));
+        assertTrue(lowestStreamers.containsKey(customerId3));
+
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+
+        var outputRecords2 = outputTopic.readRecordsToList();
+        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult2 = outputRecords2.getLast().getValue();
+        LinkedHashMap<String, Long> lowestStreamers2 = lastResult2.get(artist);
+        assertEquals(2, lowestStreamers2.size());
+        assertTrue(lowestStreamers2.containsKey(customerId3));
+        assertTrue(lowestStreamers2.containsKey(customerId1));
+    }
+    /**
+     * Scenario: 2 Event has 3 customers, each which have different number of streams for the event's artist.
+     * Only the 2, lowest streaming customers should be shown for each Event
+     */
+    @Test
+    @DisplayName("lowest streaming customers of an artist for an event they have a ticket for")
+    void lowestStreamingTicketedCustomerForMultipleEvents() {
+        // Event
+        String eventId = "event-123";
+        String eventId2 = "event-987";
+        String artist = "TaylorSwift";
+        String artist2 = "LorienTestard";
+        eventInputTopic.pipeInput(eventId, new Event(eventId, artist, "venue-123", 5, "tomorrow"));
+        eventInputTopic.pipeInput(eventId, new Event(eventId2, artist2, "venue-123", 5, "tomorrow"));
+
+        // Tickets for an event
+        String customerId1 = "customer-1";
+        String customerId2 = "customer-2";
+        String customerId3 = "customer-3";
+        String customerId4 = "customer-4";
+
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId1, eventId));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId2, eventId));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId3, eventId));
+
+        // tickets for event 2 with different artist
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId1, eventId2));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId2, eventId2));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId4, eventId2));
+
+        // Streams for the Artist (customer 2 and 3 only have 1 stream)
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist));
+
+        // Streams for Arist 2 (customer 1 and 4 have 1 stream
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId1, artist2));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist2));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist2));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist2));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist2));
+        streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId4, artist2));
+
+
+
+        var outputRecords = outputTopic.readRecordsToList();
+
+        assertEquals(10, outputRecords.size());
     }
 
 
