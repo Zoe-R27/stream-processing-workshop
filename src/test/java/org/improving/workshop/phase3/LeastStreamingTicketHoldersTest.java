@@ -19,6 +19,7 @@ import org.msse.demo.mockdata.music.stream.Stream;
 import org.msse.demo.mockdata.music.ticket.Ticket;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.improving.workshop.phase3.LeastStreamingTicketHolders.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,7 +36,7 @@ public class LeastStreamingTicketHoldersTest {
     private TestInputTopic<String, Ticket> ticketInputTopic;
 
     // outputs
-    private TestOutputTopic<String, LinkedHashMap<String, Long>> outputTopic;
+    private TestOutputTopic<String, LinkedHashMap<String, LinkedHashMap<String, Long>>> outputTopic;
 
     @BeforeEach
     void setup() {
@@ -69,7 +70,7 @@ public class LeastStreamingTicketHoldersTest {
         outputTopic = driver.createOutputTopic(
                 LOWEST_STREAMED_TICKETED_CUSTOMERS_TOPIC,
                 stringDeserializer,
-                LINKED_HASH_MAP_JSON_SERDE.deserializer()
+                SERDE_ARTIST_LOWEST_STREAMERS_JSON.deserializer()
         );
     }
 
