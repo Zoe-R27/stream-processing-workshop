@@ -315,7 +315,6 @@ public class LeastStreamingTicketHoldersTest {
         assertEquals(2, lowestStreamers.size());
         assertTrue(lowestStreamers.containsKey(customerId3));
         assertTrue(lowestStreamers.containsKey(customerId4));
-
     }
 
 

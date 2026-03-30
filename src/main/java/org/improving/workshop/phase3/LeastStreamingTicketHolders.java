@@ -26,7 +26,7 @@ public class LeastStreamingTicketHolders {
     public static final JsonSerde<SortedCounterMap> COUNTER_MAP_JSON_SERDE = new JsonSerde<>(SortedCounterMap.class);
     private static final JsonSerde<EventTicket> SERDE_EVENT_TICKET_JSON = new JsonSerde<>(EventTicket.class);
     private static final JsonSerde<CustomerStreamEventTicket> SERDE_CUSTOMER_STREAM_EVENT_TICKET_JSON = new JsonSerde<>(CustomerStreamEventTicket.class);
-    public static final String LOWEST_STREAMED_TICKETED_CUSTOMERS_TOPIC = "lowest-streamed-ticketed-customers-output-topic";
+    public static final String LOWEST_STREAMED_TICKETED_CUSTOMERS_TOPIC = "kafka-workshop-lowest-streamed-ticketed-customers-output-topic";
     // Jackson is converting Value into Integer Not Long due to erasure,
     public static final JsonSerde<LinkedHashMap<String, LinkedHashMap<String, Long>>> SERDE_ARTIST_LOWEST_STREAMERS_JSON
             = new JsonSerde<>(
