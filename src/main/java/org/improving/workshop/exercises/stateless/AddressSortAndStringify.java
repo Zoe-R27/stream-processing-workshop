@@ -7,7 +7,9 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Branched;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
+import org.msse.demo.mockdata.customer.address.Address;
 
+import static org.apache.kafka.streams.kstream.EmitStrategy.log;
 import static org.improving.workshop.Streams.*;
 
 /**
@@ -39,16 +41,24 @@ public class AddressSortAndStringify {
     }
 
     static void configureTopology(final StreamsBuilder builder) {
-//        builder
-//            .stream(TOPIC_DATA_DEMO_ADDRESSES, Consumed.with(Serdes.String(), SERDE_ADDRESS_JSON))
-//            .peek((addressId, address) -> log.info("Address Received: {}, {}", addressId, address))
-//
-//            // DESIRED FORMAT
-//            // "{line1}, {line2}, {citynm}, {state} {zip5}-{zip4} {countrycd}"
-//
-//            .peek((addressId, address) -> log.info("Address Processed: {}, {}", addressId, address))
-//            .to(DEFAULT_OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
+        builder
+            .stream(TOPIC_DATA_DEMO_ADDRESSES, Consumed.with(Serdes.String(), SERDE_ADDRESS_JSON))
+            .peek((addressId, address) -> log.info("Address Received: {}, {}", addressId, address))
+
+            // DESIRED FORMAT
+            // "{line1}, {line2}, {citynm}, {state} {zip5}-{zip4} {countrycd}"
+                .map((key, value) -> KeyValue.pair(value.state(), createAddress(value)))
+
+            .peek((addressId, address) -> log.info("Address Processed: {}, {}", addressId, address))
+                .split()
+                .branch((key, value) -> "MN".equals(key), Branched.withConsumer(ks -> ks.to(MN_OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()))))
+                .defaultBranch(Branched.withConsumer(ks -> ks.to(DEFAULT_OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()))));
+        ;
 
             // BONUS - comment out the above to() and split()
+    }
+
+    static String createAddress(Address address) {
+       return String.format("%s, %s, %s, %s %s-%s %s", address.line1(), address.line2(), address.citynm(), address.state(), address.zip5(), address.zip4(), address.countrycd());
     }
 }

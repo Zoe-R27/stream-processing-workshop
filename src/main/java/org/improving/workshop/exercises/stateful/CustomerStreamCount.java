@@ -4,9 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.Named;
 import org.apache.kafka.streams.kstream.Produced;
 import org.improving.workshop.Streams;
 
+import static org.apache.kafka.streams.kstream.EmitStrategy.log;
 import static org.improving.workshop.Streams.TOPIC_DATA_DEMO_STREAMS;
 import static org.improving.workshop.Streams.startStreams;
 
@@ -33,15 +35,20 @@ public class CustomerStreamCount {
     }
 
     static void configureTopology(final StreamsBuilder builder) {
-//        builder
-//            // consume events from INPUT_TOPIC
-//            .stream(TOPIC_DATA_DEMO_STREAMS, Consumed.with(Serdes.String(), Streams.SERDE_STREAM_JSON))
-//            .peek((streamId, stream) -> log.info("Stream Received: {}", stream))
-//
-//            // solution goes here
-//
-//            // NOTE: when using ccloud, the topic must exist or 'auto.create.topics.enable' set to true (dedicated cluster required)
-//            .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
+        builder
+            // consume events from INPUT_TOPIC
+            .stream(TOPIC_DATA_DEMO_STREAMS, Consumed.with(Serdes.String(), Streams.SERDE_STREAM_JSON))
+            .peek((streamId, stream) -> log.info("Stream Received: {}", stream))
+
+            // solution goes here
+                // rekey so that the groupBy is by customerid and not streamid
+                // groupBy is shorthand for (selectKey + groupByKey)
+                .groupBy((k, v) -> v.customerid())
+                .count(Named.as("CustomerCount"))
+                .toStream()
+
+            // NOTE: when using ccloud, the topic must exist or 'auto.create.topics.enable' set to true (dedicated cluster required)
+            .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 
 }

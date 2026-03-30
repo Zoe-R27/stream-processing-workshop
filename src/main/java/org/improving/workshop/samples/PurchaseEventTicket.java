@@ -12,6 +12,7 @@ import org.improving.workshop.Streams;
 import org.msse.demo.mockdata.music.event.Event;
 import org.msse.demo.mockdata.music.ticket.Ticket;
 import org.springframework.kafka.support.serializer.JsonSerde;
+import static org.apache.kafka.streams.kstream.EmitStrategy.log;
 
 import java.util.UUID;
 
