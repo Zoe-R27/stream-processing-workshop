@@ -19,8 +19,7 @@ import org.msse.demo.mockdata.music.event.Event;
 import org.msse.demo.mockdata.music.stream.Stream;
 import org.msse.demo.mockdata.music.ticket.Ticket;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
 
 import static org.improving.workshop.phase3.LeastStreamingTicketHolders.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,7 +38,7 @@ public class LeastStreamingTicketHoldersTest {
     private TestInputTopic<String, Ticket> ticketInputTopic;
 
     // outputs
-    private TestOutputTopic<String, LinkedHashMap<String, LinkedHashMap<String, Long>>> outputTopic;
+    private TestOutputTopic<String, LowestStreamingCustomersPerArtist> outputTopic;
 
     @BeforeEach
     void setup() {
@@ -115,15 +114,15 @@ public class LeastStreamingTicketHoldersTest {
 
         assertEquals(4, outputRecords.size());
         //the last record holds the initial top 3 state
-        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        LowestStreamingCustomersPerArtist lastResult = outputRecords.getLast().getValue();
         // assert the artist key
-        assertTrue(lastResult.containsKey(artist));
+        assertEquals(artist, lastResult.getArtistId());
 
         // assert customer1 and customer2 are the lowest streamers
-        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        List<CustomerStream> lowestStreamers = lastResult.getCustomersStreamsMap();
         assertEquals(2, lowestStreamers.size());
-        assertTrue(lowestStreamers.containsKey(customerId2));
-        assertTrue(lowestStreamers.containsKey(customerId3));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId2)));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId3)));
     }
 
     /**
@@ -162,15 +161,15 @@ public class LeastStreamingTicketHoldersTest {
 
         assertEquals(4, outputRecords.size());
         //the last record holds the initial top 3 state
-        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        LowestStreamingCustomersPerArtist lastResult = outputRecords.getLast().getValue();
         // assert the artist key
-        assertTrue(lastResult.containsKey(artist));
+        assertEquals(artist, lastResult.getArtistId());
 
         // assert customer1 and customer2 are the lowest streamers since they have a ticket
-        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        List<CustomerStream> lowestStreamers = lastResult.getCustomersStreamsMap();
         assertEquals(2, lowestStreamers.size());
-        assertTrue(lowestStreamers.containsKey(customerId2));
-        assertTrue(lowestStreamers.containsKey(customerId3));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId2)));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId3)));
     }
 
     /**
@@ -209,15 +208,15 @@ public class LeastStreamingTicketHoldersTest {
 
         assertEquals(4, outputRecords.size());
         //the last record holds the initial top 3 state
-        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        LowestStreamingCustomersPerArtist lastResult = outputRecords.getLast().getValue();
         // assert the artist key
-        assertTrue(lastResult.containsKey(artist));
+        assertEquals(artist, lastResult.getArtistId());
 
         // assert customer1 and customer2 are the lowest streamers since they have a ticket
-        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        List<CustomerStream> lowestStreamers = lastResult.getCustomersStreamsMap();
         assertEquals(2, lowestStreamers.size());
-        assertTrue(lowestStreamers.containsKey(customerId2));
-        assertTrue(lowestStreamers.containsKey(customerId3));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId2)));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId3)));
 
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId3, artist));
@@ -226,11 +225,11 @@ public class LeastStreamingTicketHoldersTest {
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
 
         var outputRecords2 = outputTopic.readRecordsToList();
-        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult2 = outputRecords2.getLast().getValue();
-        LinkedHashMap<String, Long> lowestStreamers2 = lastResult2.get(artist);
+        LowestStreamingCustomersPerArtist lastResult2 = outputRecords2.getLast().getValue();
+        List<CustomerStream> lowestStreamers2 = lastResult2.getCustomersStreamsMap();
         assertEquals(2, lowestStreamers2.size());
-        assertTrue(lowestStreamers2.containsKey(customerId3));
-        assertTrue(lowestStreamers2.containsKey(customerId1));
+        assertTrue(lowestStreamers2.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId3)));
+        assertTrue(lowestStreamers2.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId1)));
     }
     /**
      * Scenario: 2 Event has 3 customers, each which have different number of streams for the event's artist.
@@ -267,15 +266,15 @@ public class LeastStreamingTicketHoldersTest {
 
         assertEquals(4, outputRecords.size());
         //the last record holds the initial top 3 state
-        LinkedHashMap<String, LinkedHashMap<String, Long>> lastResult = outputRecords.getLast().getValue();
+        LowestStreamingCustomersPerArtist lastResult = outputRecords.getLast().getValue();
         // assert the artist key
-        assertTrue(lastResult.containsKey(artist));
+        assertEquals(artist, lastResult.getArtistId());
 
         // assert customer1 and customer2 are the lowest streamers since they have a ticket
-        LinkedHashMap<String, Long> lowestStreamers = lastResult.get(artist);
+        List<CustomerStream> lowestStreamers = lastResult.getCustomersStreamsMap();
         assertEquals(2, lowestStreamers.size());
-        assertTrue(lowestStreamers.containsKey(customerId2));
-        assertTrue(lowestStreamers.containsKey(customerId3));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId2)));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId3)));
 
         // tickets for event 2 with different artist
         ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customerId1, eventId2));
@@ -293,11 +292,11 @@ public class LeastStreamingTicketHoldersTest {
         var outputRecords2 = outputTopic.readRecordsToList();
 
         lastResult = outputRecords2.getLast().getValue();
-        assertTrue(lastResult.containsKey(artist2));
-        lowestStreamers = lastResult.get(artist2);
+        assertEquals(artist2, lastResult.getArtistId());
+        lowestStreamers = lastResult.getCustomersStreamsMap();
         assertEquals(2, lowestStreamers.size());
-        assertTrue(lowestStreamers.containsKey(customerId1));
-        assertTrue(lowestStreamers.containsKey(customerId4));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId1)));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId4)));
 
         // Add another stream for artist1
         streamsInputTopic.pipeInput(DataFaker.STREAMS.generate(customerId2, artist));
@@ -310,11 +309,11 @@ public class LeastStreamingTicketHoldersTest {
 
         log.info(outputRecords3.toString());
         lastResult = outputRecords3.getLast().getValue();
-        assertTrue(lastResult.containsKey(artist));
-        lowestStreamers = lastResult.get(artist);
+        assertEquals(artist, lastResult.getArtistId());
+        lowestStreamers = lastResult.getCustomersStreamsMap();
         assertEquals(2, lowestStreamers.size());
-        assertTrue(lowestStreamers.containsKey(customerId3));
-        assertTrue(lowestStreamers.containsKey(customerId4));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId3)));
+        assertTrue(lowestStreamers.stream().anyMatch(cs -> cs.getCustomerId().equals(customerId4)));
     }
 
 
