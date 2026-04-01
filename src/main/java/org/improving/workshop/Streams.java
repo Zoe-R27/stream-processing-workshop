@@ -7,6 +7,7 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.msse.demo.mockdata.customer.address.Address;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.msse.demo.mockdata.customer.email.Email;
 import org.msse.demo.mockdata.customer.phone.Phone;
 import org.msse.demo.mockdata.customer.profile.Customer;
@@ -81,6 +82,8 @@ public class Streams {
         // Specify default (de)serializers for record keys and for record values.
         streamsConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, "org.springframework.kafka.support.serializer.JsonSerde");
+        // Allow deserialization for user types (internal repartition topics etc.)
+        streamsConfiguration.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         // Records should be flushed every 10 seconds. This is less than the default
         // in order to keep this example interactive.
         streamsConfiguration.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 10 * 1000);
