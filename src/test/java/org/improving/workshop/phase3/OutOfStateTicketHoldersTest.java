@@ -131,6 +131,42 @@ public class OutOfStateTicketHoldersTest {
     }
 
     @Test
+    @DisplayName("out of order init missed")
+    void outOfOrderInit() {
+        String venueAddressId = "venue-address-1";
+        Address venueAddress = new Address(venueAddressId, null, "cd", "VENUE", "123 Fake St", "Suite 200",
+                "Springfield", "MN", "55409", "1234", "USA", 0.0, 0.0);
+
+        String venueId = "venue-1";
+
+        String eventId = "exciting-event-123";
+
+        String customer1AddressId = "customer-address-1";
+        String customer1Id = "customer-1";
+        Address customer1Address = new Address(customer1AddressId, customer1Id, "cd", "HOME", "223 Fake St", "Apt 203",
+                "Springfield", "MN", "55409", "1234", "USA", 0.0, 0.0);
+
+
+        String customer2AddressId = "customer-address-2";
+        String customer2Id = "customer-2";
+        Address customer2Address = new Address(customer2AddressId, customer2Id, "cd", "HOME", "1234 Lake St", null,
+                "Reno", "NV", "85409", "1234", "USA", 0.0, 0.0);
+
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customer2Id, eventId));
+        ticketInputTopic.pipeInput(DataFaker.TICKETS.generate(customer1Id, eventId));
+        eventInputTopic.pipeInput(eventId, new Event(eventId, "artist-1", venueId, 5, "today"));
+        venueInputTopic.pipeInput(venueId, new Venue(venueId, venueAddressId, "greate venue", 5));
+        addressInputTopic.pipeInput(customer2AddressId, customer2Address);
+        addressInputTopic.pipeInput(venueAddressId, venueAddress);
+        addressInputTopic.pipeInput(customer1AddressId, customer1Address);
+
+        var outputRecords = outputTopic.readRecordsToList();
+
+        // since the KTables are empty, no results will be found
+        assertEquals(0, outputRecords.size());
+    }
+
+    @Test
     @DisplayName("ignore in state ticket holder")
     void purchaseInStateTicket() {
         String venueAddressId = "venue-address-1";

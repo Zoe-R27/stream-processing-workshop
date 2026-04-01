@@ -23,6 +23,9 @@ import static org.improving.workshop.Streams.startStreams;
 
 @Slf4j
 public class OutOfStateTicketHolders {
+    // .../data-demo $ ./gradlew bootRunDaemon -Pspring.profiles.active=kafka
+    // .../stream-processing-workshop $ ./gradlew -Pstream=org.improving.workshop.phase3.OutOfStateTicketHolders run
+    // .../data-demo $ ./kafka-bin/kafka-console-consumer --topic kafka-workshop-phase3-out-of-state-ticket-holders --from-beginning
     public static final String OUTPUT_TOPIC = "kafka-workshop-phase3-out-of-state-ticket-holders";
 
     public static final JsonSerde<CustomerAddressTicket> CUSTOMER_ADDRESS_TICKET_JSON_SERDE = new JsonSerde<>(CustomerAddressTicket.class);
@@ -46,8 +49,7 @@ public class OutOfStateTicketHolders {
         // KTable used for event venue address lookup, gets merged with venue
         KTable<String, Address> addressKTable = builder
                 .stream(TOPIC_DATA_DEMO_ADDRESSES, Consumed.with (Serdes.String(), SERDE_ADDRESS_JSON))
-                .peek((streamId, stream) -> log.info("Address Stream consumed for venues Received: {}", stream))
-                .peek((streamId, stream) -> log.info("addresses Storing address: {}", stream))
+                // .peek((streamId, stream) -> log.info("Address Stream consumed for venues Received: {}", stream))
                 .toTable(
                         Materialized
                                 .<String, Address>as(persistentKeyValueStore("addresses"))
@@ -58,10 +60,10 @@ public class OutOfStateTicketHolders {
         // KTable used for customer address lookup, gets merged with tickets
         KTable<String, Address> customerAddressTable = builder
                 .stream(TOPIC_DATA_DEMO_ADDRESSES, Consumed.with (Serdes.String(), SERDE_ADDRESS_JSON))
-                .peek((streamId, stream) -> log.info("Address Stream consumed for customers Received: {}", stream))
+                // .peek((streamId, stream) -> log.info("Address Stream consumed for customers Received: {}", stream))
                 // may need to filter out addresses with a null customerid
                 .selectKey((addressId, address) -> address.customerid(), Named.as("rekey-address-by-customerid"))
-                .peek((streamId, stream) -> log.info("customerAddresses Storing address: {}", stream))
+                // .peek((streamId, stream) -> log.info("customerAddresses Storing address: {}", stream))
                 .toTable(
                         Materialized
                                 .<String, Address>as(persistentKeyValueStore("customerAddresses"))
@@ -72,14 +74,14 @@ public class OutOfStateTicketHolders {
         // KTable used for Venue Address Lookup, gets merged with events
         KTable<String, VenueAddressPair> venueAddressTable = builder
                 .stream(TOPIC_DATA_DEMO_VENUES, Consumed.with (Serdes.String(), SERDE_VENUE_JSON))
-                .peek((streamId, stream) -> log.info("Venue Stream Received: {}", stream))
+                // .peek((streamId, stream) -> log.info("Venue Stream Received: {}", stream))
                 .selectKey((k, venue) -> venue.addressid(), Named.as("rekey-venue-by-venue.addressid"))
                 .join(
                         addressKTable,
                         (addressId, venue, address) -> new VenueAddressPair(venue, address)
                 )
                 .selectKey((addressId, venueAddress) -> venueAddress.venue.id(), Named.as("rekey-venue-address-by-venue-id"))
-                .peek((streamId, stream) -> log.info("venueAddresses Storing VenueAddress: {}", stream))
+                // .peek((streamId, stream) -> log.info("venueAddresses Storing VenueAddress: {}", stream))
                 .toTable(
                         Materialized
                                 .<String, VenueAddressPair>as(persistentKeyValueStore("venueAddresses"))
@@ -90,16 +92,16 @@ public class OutOfStateTicketHolders {
         // KTable used for Event Address Lookup, Merged with Customer Tickets
         KTable<String, EventVenueAddress> eventAddressTable = builder
                 .stream(TOPIC_DATA_DEMO_EVENTS, Consumed.with (Serdes.String(), SERDE_EVENT_JSON))
-                .peek((streamId, stream) -> log.info("Event Stream Received: {}", stream))
+                // .peek((streamId, stream) -> log.info("Event Stream Received: {}", stream))
                 .selectKey((id, event) -> event.venueid(), Named.as("rekey-event-by-venue-id"))
-                .peek((k, v) -> log.info("joining event: {}", v))
+                // .peek((k, v) -> log.info("joining event: {}", v))
                 .join(
                         venueAddressTable,
                         (venueId, event, venueAddress) -> new EventVenueAddress(event, venueAddress.venue, venueAddress.address)
                 )
-                .peek((k,v) -> log.info("event venue: {}", v))
+                // .peek((k,v) -> log.info("event venue: {}", v))
                 .selectKey((venue_id, eventVenueAddress) -> eventVenueAddress.event.id(), Named.as("rekey-event-venue-address-by-event-id"))
-                .peek((streamId, stream) -> log.info("eventVenueAddresses Storing address: {}", stream))
+                // .peek((streamId, stream) -> log.info("eventVenueAddresses Storing address: {}", stream))
                 .toTable(
                         Materialized
                                 .<String, EventVenueAddress>as(persistentKeyValueStore("eventVenueAddresses"))
@@ -118,21 +120,21 @@ public class OutOfStateTicketHolders {
                         customerAddressTable,
                         (customer_id, ticket, customerAddress) -> new TicketCustomerAddress(ticket, customerAddress)
                 )
-                .peek((streamId, stream) -> log.info("Found customer ticket address: {}", stream))
+                .peek((streamId, stream) -> log.info(" - Found customer ticket address: {}", stream))
                 .selectKey((customer_id, ticketCustomerAddress) -> ticketCustomerAddress.ticket.eventid(), Named.as("rekey-ticket-customer-address-by-event-id"))
                 .join(
                         eventAddressTable,
                         (event_id, ticketCustomer, event) ->
                                 new TicketCustomerEvent(ticketCustomer.ticket, ticketCustomer.customerAddress, event.address, event.event, event.venue)
                 )
-                .peek((k, v) -> log.info("from {} to {} customer ticket address and venue address: {}", v.customerAddress.state(), v.eventAddress.state(), v))
+                .peek((k, v) -> log.info(" - - - from {} to {} customer ticket address and venue address: {}", v.customerAddress.state(), v.eventAddress.state(), v))
                 // if we care about instate customers, we could branch, but that will be a "hot topic"
                 .filter((customer_id, ticketCustomerEvent) ->
                         // different states == out of state event
                         !ticketCustomerEvent.customerAddress.state().equals(ticketCustomerEvent.eventAddress.state())
                 )
-                .peek((k,v) -> log.info("Customer from {} going to {} event {} customer {}", v.customerAddress.state(), v.eventAddress.state(), v.customerAddress.customerid(), v.event.id()))
-                .mapValues((k,v) -> new CustomerAddressTicket(v.ticket.customerid(), v.customerAddress, v.ticket))
+                .peek((k,v) -> log.info(" - - - - - > Customer from {} going to {} event {} customer {}", v.customerAddress.state(), v.eventAddress.state(), v.customerAddress.customerid(), v.event.id()))
+                .mapValues((k,v) -> new CustomerAddressTicket(v.ticket.customerid(), v.customerAddress.state(), v.eventAddress.state(), v.customerAddress, v.ticket))
                 // potentially want to repartition by customer
                 // .selectKey()
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), CUSTOMER_ADDRESS_TICKET_JSON_SERDE));
@@ -180,6 +182,8 @@ public class OutOfStateTicketHolders {
     @AllArgsConstructor
     public static class CustomerAddressTicket {
         private String customerId;
+        private String customerState;
+        private String eventState;
         private Address customerAddress;
         private Ticket ticket;
     }
