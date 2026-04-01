@@ -1,4 +1,4 @@
-package org.improving.workshop.exercises.phase3;
+package org.improving.workshop.phase3;
 
 
 import org.apache.kafka.common.serialization.Serdes;
