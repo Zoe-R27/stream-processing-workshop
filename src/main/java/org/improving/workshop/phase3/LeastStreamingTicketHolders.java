@@ -1,8 +1,5 @@
 package org.improving.workshop.phase3;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,7 +12,7 @@ import org.msse.demo.mockdata.music.stream.Stream;
 import org.msse.demo.mockdata.music.ticket.Ticket;
 import org.springframework.kafka.support.serializer.JsonSerde;
 import java.util.*;
-import static java.util.stream.Collectors.toMap;
+import java.util.stream.Collectors;
 import static org.apache.kafka.streams.state.Stores.persistentKeyValueStore;
 import static org.improving.workshop.Streams.*;
 
@@ -27,14 +24,8 @@ public class LeastStreamingTicketHolders {
     private static final JsonSerde<EventTicket> SERDE_EVENT_TICKET_JSON = new JsonSerde<>(EventTicket.class);
     private static final JsonSerde<CustomerStreamEventTicket> SERDE_CUSTOMER_STREAM_EVENT_TICKET_JSON = new JsonSerde<>(CustomerStreamEventTicket.class);
     public static final String LOWEST_STREAMED_TICKETED_CUSTOMERS_TOPIC = "kafka-workshop-lowest-streamed-ticketed-customers-output-topic";
-    // Jackson is converting Value into Integer Not Long due to erasure,
-    public static final JsonSerde<LinkedHashMap<String, LinkedHashMap<String, Long>>> SERDE_ARTIST_LOWEST_STREAMERS_JSON
-            = new JsonSerde<>(
-            new TypeReference<LinkedHashMap<String, LinkedHashMap<String, Long>>>() {
-            },
-            new ObjectMapper()
-                    .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
-    );
+    public static final JsonSerde<LowestStreamingCustomersPerArtist> SERDE_ARTIST_LOWEST_STREAMERS_JSON
+            = new JsonSerde<>(LowestStreamingCustomersPerArtist.class);
 
     public static void main(String[] args) {
         final StreamsBuilder builder = new StreamsBuilder();
@@ -117,7 +108,7 @@ public class LeastStreamingTicketHolders {
                 )
                 .toStream()
                 .peek((sortedCounterMapId, sortedCounterMap) -> log.info("Sorted Counted Map: {}", sortedCounterMap))
-                .mapValues(sortedCounterMap -> sortedCounterMap.topWithArtist(bottomNumberStreamers))
+                .mapValues(sortedCounterMap -> sortedCounterMap.topWithArtist(bottomNumberStreamers), Named.as("map-to-lowest-streaming-customers-per-artist"))
                 .peek((key, value) ->
                         log.info("Lowest Streaming Customers: {}", value)
                 )
@@ -140,6 +131,21 @@ public class LeastStreamingTicketHolders {
         private EventTicket eventTicket;
     }
 
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class CustomerStream {
+        private String customerId;
+        private long streamAmount;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class LowestStreamingCustomersPerArtist {
+        private String artistId;
+        private List<CustomerStream> customersStreamsMap;
+    }
     @Data
     @AllArgsConstructor
     public static class SortedCounterMap {
@@ -179,25 +185,27 @@ public class LeastStreamingTicketHolders {
             this.map = map.entrySet().stream()
                     .sorted(Map.Entry.comparingByValue())
                     .limit(maxSize)
-                    .collect(toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
         }
 
-        public LinkedHashMap<String, Long> top(int limit) {
+        public List<CustomerStream> top(int limit) {
             return map.entrySet().stream()
                     .limit(limit)
-                    .collect(toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+                    .map(e -> new CustomerStream(e.getKey(), e.getValue()))
+                    .collect(Collectors.toList());
         }
 
         /**
          * Returns the artistId paired with the top {limit} lowest-streaming customers
          *
          * @param limit the number of customer records to include
-         * @return a LinkedHashMap of artistId -> customer stream counts
+         * @return a LowestStreamingCustomersPerArtist containing the artistId and customer stream counts
          */
-        public LinkedHashMap<String, LinkedHashMap<String, Long>> topWithArtist(int limit) {
-            LinkedHashMap<String, LinkedHashMap<String, Long>> result = new LinkedHashMap<>();
-            result.put(artistId != null ? artistId : "unknown", top(limit));
-            return result;
+        public LowestStreamingCustomersPerArtist topWithArtist(int limit) {
+            return new LowestStreamingCustomersPerArtist(
+                    artistId != null ? artistId : "unknown",
+                    top(limit)
+            );
         }
     }
 }
