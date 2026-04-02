@@ -116,7 +116,6 @@ public class InStateStreamTest {
   public void testInstate() {
     //Test Cases covered in this:
         //1. Typical case, Event with N in state Streams and X capacity
-        //TODO am I ever counting more than one in-state customer streaming an artist?
         //2. Venue capacity != event capacity, M in state streams and Y capacity where venue is Z capacity
         //3. Event with 0 total streams (should still report 0 since event was created)
         //4. Event with 0 in-state streams, but some out of state (again, should report 0)
@@ -128,26 +127,26 @@ public class InStateStreamTest {
 
 
     //Generate list of venues and addresses
-    String venueId1 = "venue-1";
+    String venueId_MN = "venue-1";
     String venueId1_Address = "venue-address-1";
     addressInputTopic.pipeInput(venueId1_Address, new Address(venueId1_Address, null, "US", "venue", "111", "222", "ABC", "MN", "55102", "111", "US", 45.0, 100.0));
-    venueInputTopic.pipeInput(venueId1, new Venue(venueId1, venueId1_Address, "First Ave", 2000));
-    String venueId2 = "venue-2";
+    venueInputTopic.pipeInput(venueId_MN, new Venue(venueId_MN, venueId1_Address, "First Ave", 2000));
+    String venueId_WV = "venue-2";
     String venueId2_Address = "venue-address-2";
     addressInputTopic.pipeInput(venueId2_Address, new Address(venueId2_Address, null, "US", "venue", "111", "222", "ABC", "WV", "55102", "111", "US", 45.0, 100.0));
-    venueInputTopic.pipeInput(venueId2, new Venue(venueId2, venueId2_Address, "Billy Bobs House", 80));
-    String venueId3 = "venue-3";
+    venueInputTopic.pipeInput(venueId_WV, new Venue(venueId_WV, venueId2_Address, "Billy Bobs House", 80));
+    String venueId_NY = "venue-3";
     String venueId3_Address = "venue-address-3";
     addressInputTopic.pipeInput(venueId3_Address, new Address(venueId3_Address, null, "US", "venue", "111", "222", "ABC", "NY", "55102", "111", "US", 45.0, 100.0));
-    venueInputTopic.pipeInput(venueId3, new Venue(venueId3, venueId3_Address, "Madison Square Garden", 50000));
-    String venueId4 = "venue-4";
+    venueInputTopic.pipeInput(venueId_NY, new Venue(venueId_NY, venueId3_Address, "Madison Square Garden", 50000));
+    String venueId_WI = "venue-4";
     String venueId4_Address = "venue-address-4";
     addressInputTopic.pipeInput(venueId4_Address, new Address(venueId4_Address, null, "US", "venue", "111", "222", "ABC", "WI", "55102", "111", "US", 45.0, 100.0));
-    venueInputTopic.pipeInput(venueId4, new Venue(venueId4, venueId4_Address, "Fiserv Forum", 30000));
-    String venueId5 = "venue-5";
+    venueInputTopic.pipeInput(venueId_WI, new Venue(venueId_WI, venueId4_Address, "Fiserv Forum", 30000));
+    String venueId_MN_2 = "venue-5";
     String venueId5_Address = "venue-address-5";
     addressInputTopic.pipeInput(venueId5_Address, new Address(venueId5_Address, null, "US", "venue", "111", "222", "ABC", "MN", "55102", "111", "US", 45.0, 100.0));
-    venueInputTopic.pipeInput(venueId5, new Venue(venueId5, venueId5_Address, "Myth", 4000));
+    venueInputTopic.pipeInput(venueId_MN_2, new Venue(venueId_MN_2, venueId5_Address, "Myth", 4000));
 
 
     //Generate List of Artists for below logic, not fed into topics
@@ -158,51 +157,51 @@ public class InStateStreamTest {
 
 
     //Generate streams and addresses associated with customer IDs
-    String customerId1 = "customer-1";
+    String customerId_MN = "customer-1";
     String customerId1_Address = "customer-address-1";
-    addressInputTopic.pipeInput(customerId1_Address, new Address(customerId1_Address, customerId1, "US", "venue", "111", "222", "ABC", "MN", "55102", "111", "US", 45.0, 100.0));
+    addressInputTopic.pipeInput(customerId1_Address, new Address(customerId1_Address, customerId_MN, "US", "venue", "111", "222", "ABC", "MN", "55102", "111", "US", 45.0, 100.0));
     //customer 1 streams
-    GenerateStreamEvent(customerId1, artistId1, 5, "11111111"); //listen to artist1 5 times
-    GenerateStreamEvent(customerId1, artistId2, 2, "11111112"); //listen to artist1 2 times
-    GenerateStreamEvent(customerId1, artistId3, 3, "11111113"); //listen to artist1 3 times
+    GenerateStreamEvent(customerId_MN, artistId1, 5, "11111111"); //listen to artist1 5 times
+    GenerateStreamEvent(customerId_MN, artistId2, 2, "11111112"); //listen to artist1 2 times
+    GenerateStreamEvent(customerId_MN, artistId3, 3, "11111113"); //listen to artist1 3 times
 
 
     //Generate streams and addresses associated with customer IDs
-    String customerId2 = "customer-2";
+    String customerId_AK = "customer-2";
     String customerId2_Address = "customer-address-2";
-    addressInputTopic.pipeInput(customerId2_Address, new Address(customerId2_Address, customerId2, "US", "venue", "111", "222", "ABC", "AK", "55102", "111", "US", 45.0, 100.0));
+    addressInputTopic.pipeInput(customerId2_Address, new Address(customerId2_Address, customerId_AK, "US", "venue", "111", "222", "ABC", "AK", "55102", "111", "US", 45.0, 100.0));
     //customer 2 streams
-    GenerateStreamEvent(customerId2, artistId2, 5, "11111114");
-    GenerateStreamEvent(customerId2, artistId1, 2, "11111115");
-    GenerateStreamEvent(customerId2, artistId3, 3, "11111116");
+    GenerateStreamEvent(customerId_AK, artistId2, 5, "11111114");
+    GenerateStreamEvent(customerId_AK, artistId1, 2, "11111115");
+    GenerateStreamEvent(customerId_AK, artistId3, 3, "11111116");
 
 
     //Generate streams and addresses associated with customer IDs
-    String customerId3 = "customer-3";
+    String customerId_WV = "customer-3";
     String customerId3_Address = "customer-address-3";
-    addressInputTopic.pipeInput(customerId3_Address, new Address(customerId3_Address, customerId3, "US", "venue", "111", "222", "ABC", "WV", "55102", "111", "US", 45.0, 100.0));
+    addressInputTopic.pipeInput(customerId3_Address, new Address(customerId3_Address, customerId_WV, "US", "venue", "111", "222", "ABC", "WV", "55102", "111", "US", 45.0, 100.0));
     //customer 3 streams
-    GenerateStreamEvent(customerId3, artistId1, 4, "11111117");
-    GenerateStreamEvent(customerId3, artistId3, 2, "11111118");
-    GenerateStreamEvent(customerId3, artistId2, 3, "11111119");
+    GenerateStreamEvent(customerId_WV, artistId1, 4, "11111117");
+    GenerateStreamEvent(customerId_WV, artistId3, 2, "11111118");
+    GenerateStreamEvent(customerId_WV, artistId2, 3, "11111119");
     // update customer3's address for Test case 9
     String customerId3_Address2 = "customer-address-4";
-    addressInputTopic.pipeInput(customerId3_Address2, new Address(customerId3_Address2, customerId3, "US", "venue", "111", "222", "ABC", "KS", "55102", "111", "US", 45.0, 100.0));
+    addressInputTopic.pipeInput(customerId3_Address2, new Address(customerId3_Address2, customerId_WV, "US", "venue", "111", "222", "ABC", "KS", "55102", "111", "US", 45.0, 100.0));
     // listen to artist2 more, as they have an event in their previous address' state
-    GenerateStreamEvent(customerId3, artistId2, 2, "11111120");
+    GenerateStreamEvent(customerId_WV, artistId2, 2, "11111120");
 
 
     //Generate events tied to venues above
-    String eventId1 = "event-1";
-    eventInputTopic.pipeInput(eventId1, new Event(eventId1, artistId1, venueId1, 2000, "01012026"));
-    String eventId2 = "event-2";
-    eventInputTopic.pipeInput(eventId2, new Event(eventId2, artistId2, venueId2, 50, "01312026"));
-    String eventId3 = "event-3";
-    eventInputTopic.pipeInput(eventId3, new Event(eventId3, artistId4, venueId3, 50000, "02102026"));
-    String eventId4 = "event-4";
-    eventInputTopic.pipeInput(eventId4, new Event(eventId4, artistId1, venueId4, 30000, "02202026"));
-    String eventId5 = "event-5";
-    eventInputTopic.pipeInput(eventId5, new Event(eventId5, artistId1, venueId2, 50, "02282026"));
+    String eventId_MN = "event-1";
+    eventInputTopic.pipeInput(eventId_MN, new Event(eventId_MN, artistId1, venueId_MN, 2000, "01012026"));
+    String eventId_WV = "event-2";
+    eventInputTopic.pipeInput(eventId_WV, new Event(eventId_WV, artistId2, venueId_WV, 50, "01312026"));
+    String eventId_NY = "event-3";
+    eventInputTopic.pipeInput(eventId_NY, new Event(eventId_NY, artistId4, venueId_NY, 50000, "02102026"));
+    String eventId_WI = "event-4";
+    eventInputTopic.pipeInput(eventId_WI, new Event(eventId_WI, artistId1, venueId_WI, 30000, "02202026"));
+    String eventId_WV_2 = "event-5";
+    eventInputTopic.pipeInput(eventId_WV_2, new Event(eventId_WV_2, artistId1, venueId_WV, 50, "02282026"));
 
 
     //Check output
@@ -242,15 +241,15 @@ public class InStateStreamTest {
     assertEquals("WV", outputRecords.get(4).value().state()); //event's state should be WV
    
     //Test case 7 - Streams AFTER event is generated should be ignored
-    GenerateStreamEvent(customerId2, artistId1, 5, "11111111"); //listen to artist1 5 times
+    GenerateStreamEvent(customerId_WV, artistId1, 5, "11111111"); //listen to artist1 5 times
     outputRecords.addAll(outputTopic.readRecordsToList()); //repoll the output topic
     assertEquals(5, outputRecords.size()); //the size should not have changed, should still be 5 which is the same as number of events
 
     //Test case 8 - Artist with multiple events in the SAME state
     //
     //add a second MN event for artist1
-    String eventId6 = "event-6";
-    eventInputTopic.pipeInput(eventId6, new Event(eventId6, artistId1, venueId5, 4000, "03012026"));
+    String eventId_MN_2 = "event-6";
+    eventInputTopic.pipeInput(eventId_MN_2, new Event(eventId_MN_2, artistId1, venueId_MN_2, 4000, "03012026"));
     outputRecords.addAll(outputTopic.readRecordsToList()); //repoll the output topic
     assertEquals(6, outputRecords.size()); //the size should have increased by one with the new event
     assertEquals(5, outputRecords.get(5).value().streamCount()); //two events for one artist's in-state stream count should be 5
